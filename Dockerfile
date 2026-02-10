@@ -1,37 +1,30 @@
-# Use the community-maintained, Render-recommended image with NGINX + PHP-FPM
 FROM richarvey/nginx-php-fpm:3.1.6
 
-# Set Laravel-optimized environment variables (these are read by the image's start script)
-                # For proper X-Forwarded-For handling on Render
-
-# Copy application code
-COPY . /var/www/html
-
-# Install dependencies (the image has composer; this runs if needed)
-# But since we copy composer files first in practice, caching works
-# RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-
-# The image already has most extensions; add any extras if missing (e.g., gd, pgsql)
-# Most are pre-installed in recent tags, but to be safe:
+# Install only the dependencies you actually need
 RUN apk add --no-cache \
+    git \
+    curl \
     libpng-dev \
     libjpeg-turbo-dev \
     libwebp-dev \
     postgresql-dev \
-    tesseract-ocr \
-    tesseract-ocr-data-eng \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install gd pdo_pgsql exif pcntl bcmath
 
-# Permissions for Laravel (storage & cache must be writable)
+# Copy your Laravel app
+COPY . /var/www/html
+
+# Key env vars for the image to behave correctly
+ENV SKIP_COMPOSER=1
+ENV WEBROOT=/var/www/html/public          
+ENV PHP_ERRORS_STDERR=1
+ENV RUN_SCRIPTS=1
+ENV REAL_IP_HEADER=1
+
+# Fix permissions (Laravel storage must be writable by www-data)
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# The image's built-in start.sh handles:
-# - Composer install if needed
-# - artisan storage:link if missing
-# - Starts supervisord → NGINX + PHP-FPM
-# No custom ENTRYPOINT or CMD needed!
+# No custom CMD/ENTRYPOINT needed — image starts NGINX + PHP-FPM automatically
 
-# Expose port 80 (NGINX listens here; Render proxies automatically)
 EXPOSE 80
