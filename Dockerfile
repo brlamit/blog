@@ -1,48 +1,37 @@
-FROM php:8.2-fpm-alpine
+# Use the community-maintained, Render-recommended image with NGINX + PHP-FPM
+FROM richarvey/nginx-php-fpm:3.1.6
 
-# Install system dependencies
-RUN apk add --no-cache \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    mysql-client \
-    postgresql-dev \
-    bash \
-    tesseract-ocr \
-    tesseract-ocr-data-eng
-
-# Install PHP extensions (support both MySQL and Postgres drivers)
-RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd
-
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory
-WORKDIR /var/www/html
-
-# Copy composer files and install PHP dependencies
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+# Set Laravel-optimized environment variables (these are read by the image's start script)
+                # For proper X-Forwarded-For handling on Render
 
 # Copy application code
-COPY . .
+COPY . /var/www/html
 
-# Copy docker entrypoint
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Install dependencies (the image has composer; this runs if needed)
+# But since we copy composer files first in practice, caching works
+# RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-# Set permissions
+# The image already has most extensions; add any extras if missing (e.g., gd, pgsql)
+# Most are pre-installed in recent tags, but to be safe:
+RUN apk add --no-cache \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    libwebp-dev \
+    postgresql-dev \
+    tesseract-ocr \
+    tesseract-ocr-data-eng \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
+    && docker-php-ext-install gd pdo_pgsql exif pcntl bcmath
+
+# Permissions for Laravel (storage & cache must be writable)
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port
-EXPOSE 8000
+# The image's built-in start.sh handles:
+# - Composer install if needed
+# - artisan storage:link if missing
+# - Starts supervisord → NGINX + PHP-FPM
+# No custom ENTRYPOINT or CMD needed!
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-# Start Laravel using the built-in server (suitable for dev). Replace with php-fpm + nginx for production.
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Expose port 80 (NGINX listens here; Render proxies automatically)
+EXPOSE 80
