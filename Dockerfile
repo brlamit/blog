@@ -1,4 +1,6 @@
 FROM richarvey/nginx-php-fpm:3.1.6
+# Copy custom NGINX site config to override the default one
+COPY conf/nginx/default.conf /etc/nginx/conf.d/default.conf
 
 # Install only the dependencies you actually need
 RUN apk add --no-cache \
