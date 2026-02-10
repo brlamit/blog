@@ -3,6 +3,10 @@ FROM richarvey/nginx-php-fpm:3.1.6
 # Copy custom NGINX config first
 COPY conf/nginx/default.conf /etc/nginx/conf.d/default.conf
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Install system/PHP dependencies
 RUN apk add --no-cache \
     git \
