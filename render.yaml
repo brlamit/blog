@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: blog-app
+    env: docker
+    plan: free   # or starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: blog-db
+          property: connectionString
+      - key: APP_KEY
+        value: your-app-key-here   # generate locally
+      - key: APP_ENV
+        value: production
+    # ... other vars
+
+databases:
+  - name: blog-db
+    plan: free
+    databaseName: blog_3xpv   # match your current
+    user: youruser
+
+# Optional: one-time migration job on deploy
+jobs:
+  - type: run
+    name: migrate
+    command: php artisan migrate --force --no-interaction
+    serviceName: blog-app   # run after web starts
