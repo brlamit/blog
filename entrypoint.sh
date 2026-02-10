@@ -1,7 +1,14 @@
 #!/bin/sh
 set -e
 
-php artisan migrate --force --no-interaction
-php artisan optimize
+# Run migrations (keep this)
+php artisan migrate --force --no-interaction || echo "Migrations skipped"
 
-exec php-fpm  # or exec /start.sh if your image has it
+# Optimize
+php artisan optimize || true
+
+# Start PHP-FPM in background
+php-fpm -D
+
+# Start NGINX in foreground
+exec nginx -g "daemon off;"
