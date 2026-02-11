@@ -1,61 +1,19 @@
-############################################
-# STAGE 1 — Composer (FIXED)
-############################################
-FROM php:8.2-cli-alpine AS vendor
-
-# Install dependencies needed for composer + filament
-RUN apk add --no-cache \
-    icu-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    git \
-    && docker-php-ext-install intl zip
-
-# Install composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-WORKDIR /app
-
-COPY composer.json composer.lock ./
-
-RUN composer install \
-    --no-dev \
-    --no-interaction \
-    --prefer-dist \
-    --optimize-autoloader
-
-
-############################################
-# STAGE 2 — Node build (Vite assets)
-############################################
-FROM node:20-alpine AS frontend
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
-RUN npm run build
-
-
-############################################
-# STAGE 3 — Final PHP-FPM image
-############################################
+# === PRODUCTION DOCKERFILE ===
 FROM php:8.2-fpm-alpine
 
-# Install PHP extensions required by Laravel + Filament
+# Install system dependencies + PHP extensions
 RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     libpng-dev \
     oniguruma-dev \
-    postgresql-dev \
     bash \
     nginx \
+    postgresql-dev \
+    zip \
+    unzip \
+    git \
+    nodejs npm \
     && docker-php-ext-install \
         pdo_mysql \
         pdo_pgsql \
@@ -67,18 +25,29 @@ RUN apk add --no-cache \
         exif \
         pcntl
 
+# Set workdir
 WORKDIR /var/www/html
 
-# Copy application code
+# Copy app + install composer
+COPY composer.json composer.lock ./
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN composer install --no-dev --optimize-autoloader --prefer-dist
+
+# Copy rest of the app
 COPY . .
 
-# Copy vendor from composer stage
-COPY --from=vendor /app/vendor ./vendor
+# Build frontend assets
+RUN npm install && npm run build
 
-# Copy frontend assets
-COPY --from=frontend /app/public/build ./public/build
-
-# Permissions
+# Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache
 
-CMD ["php-fpm"]
+# Copy Nginx config
+COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+
+# Expose port
+EXPOSE 80
+
+# Start PHP-FPM + Nginx
+CMD ["sh", "-c", "php-fpm & nginx -g 'daemon off;'"]
