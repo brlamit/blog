@@ -39,8 +39,8 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 # Copy full application code
 COPY . .
 
-# Copy production env if exists
-COPY .env.production* ./
+# Use production env file as default env
+RUN if [ -f .env.production ]; then cp .env.production .env; fi
 
 # Copy built assets from Node builder
 COPY --from=node-builder /build/public/build ./public/build
@@ -52,8 +52,10 @@ RUN chown -R www-data:www-data /var/www/html \
 # Expose port
 EXPOSE 8000
 
-# Clear caches and run migrations on startup
-CMD php artisan config:cache && \
+# Clear old caches and cache fresh config on startup
+CMD php artisan config:clear && \
+    php artisan view:clear && \
+    php artisan config:cache && \
     php artisan view:cache && \
     php artisan migrate --force && \
     php artisan serve --host=0.0.0.0 --port=8000
