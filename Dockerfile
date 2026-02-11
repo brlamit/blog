@@ -56,8 +56,13 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Expose port
 EXPOSE 8000
 
-# Use entrypoint script
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Start Laravel
-CMD php artisan serve --host=0.0.0.0 --port=8000
+# Start Laravel with proper startup sequence
+CMD sh -c '\
+    if ! grep -q "APP_KEY=" .env; then php artisan key:generate --force; fi && \
+    php artisan config:clear && \
+    php artisan view:clear && \
+    php artisan config:cache && \
+    php artisan view:cache && \
+    php artisan migrate --force && \
+    php artisan serve --host=0.0.0.0 --port=8000\
+'
