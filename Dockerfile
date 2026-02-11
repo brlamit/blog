@@ -1,18 +1,19 @@
-# === PRODUCTION DOCKERFILE ===
-FROM php:8.2-fpm-alpine
+# -----------------------------
+# Stage 1: Install PHP & Composer dependencies
+# -----------------------------
+FROM php:8.2-fpm-alpine AS base
 
 # Install system dependencies + PHP extensions
 RUN apk add --no-cache \
+    bash \
+    git \
     icu-dev \
     libzip-dev \
-    libpng-dev \
-    oniguruma-dev \
-    bash \
-    nginx \
-    postgresql-dev \
     zip \
     unzip \
-    git \
+    libpng-dev \
+    oniguruma-dev \
+    postgresql-dev \
     nodejs npm \
     && docker-php-ext-install \
         pdo_mysql \
@@ -25,29 +26,38 @@ RUN apk add --no-cache \
         exif \
         pcntl
 
-# Set workdir
+# Set working directory
 WORKDIR /var/www/html
 
-# Copy app + install composer
+# Copy composer files
 COPY composer.json composer.lock ./
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-RUN composer install --no-dev --optimize-autoloader --prefer-dist
 
-# Copy rest of the app
+# Install composer (from official composer image)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Install PHP dependencies WITHOUT running scripts (artisan not copied yet)
+RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
+
+# -----------------------------
+# Stage 2: Copy application code + run artisan commands
+# -----------------------------
 COPY . .
 
-# Build frontend assets
-RUN npm install && npm run build
+# Now artisan exists → run scripts safely
+RUN php artisan package:discover --ansi \
+    && php artisan storage:link --force \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-# Set permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
-RUN chmod -R 775 storage bootstrap/cache
+# -----------------------------
+# Stage 3: Build frontend assets (Vite + Tailwind)
+# -----------------------------
+RUN npm ci && npm run build
 
-# Copy Nginx config
-COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+# -----------------------------
+# Stage 4: Final image ready to serve
+# -----------------------------
+EXPOSE 8000
 
-# Expose port
-EXPOSE 80
-
-# Start PHP-FPM + Nginx
-CMD ["sh", "-c", "php-fpm & nginx -g 'daemon off;'"]
+# Entrypoint: run PHP-FPM (production)
+CMD ["php-fpm"]
