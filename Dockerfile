@@ -52,14 +52,15 @@ COPY --from=node-builder /build/public/build ./public/build
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Clear old caches and cache fresh config on startup
-CMD php artisan config:clear && \
-    php artisan view:clear && \
-    php artisan config:cache && \
-    php artisan view:cache && \
-    php artisan migrate --force && \
-    php artisan serve --host=0.0.0.0 --port=8000
+# Use entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
+# Start Laravel
+CMD php artisan serve --host=0.0.0.0 --port=8000

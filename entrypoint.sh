@@ -3,6 +3,14 @@ set -e
 
 echo "🚀 Starting Laravel entrypoint..."
 
+# 0️⃣ Ensure APP_KEY is set - generate if missing
+if ! grep -q "APP_KEY=" .env; then
+    echo "🔑 Generating APP_KEY..."
+    php artisan key:generate --force
+else
+    echo "✅ APP_KEY already set"
+fi
+
 # 1️⃣ Ensure storage symlink exists
 echo "🔗 Creating storage symlink..."
 php artisan storage:link --force || true
