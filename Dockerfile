@@ -21,9 +21,7 @@ RUN apk add --no-cache \
     postgresql-dev \
     bash \
     libzip-dev \
-    pkgconf \
-    nginx \
-    supervisor
+    pkgconf
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd intl zip
@@ -48,14 +46,8 @@ COPY --from=node-builder /build/public/build ./public/build
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Create necessary directories
-RUN mkdir -p /var/log/supervisor
-
-# Copy supervisord config for running PHP-FPM and Nginx
-COPY docker-nginx.conf /etc/nginx/conf.d/default.conf
-COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
 # Expose port
 EXPOSE 8000
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Run Laravel migrations and start the server
+CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000
