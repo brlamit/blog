@@ -1,7 +1,5 @@
-# -----------------------------
-# Stage 1: Install PHP & Composer dependencies
-# -----------------------------
-FROM php:8.2-fpm-alpine AS base
+# Base image
+FROM php:8.2-fpm-alpine
 
 # Install system dependencies + PHP extensions
 RUN apk add --no-cache \
@@ -15,6 +13,7 @@ RUN apk add --no-cache \
     oniguruma-dev \
     postgresql-dev \
     nodejs npm \
+    mysql-client \
     && docker-php-ext-install \
         pdo_mysql \
         pdo_pgsql \
@@ -29,35 +28,27 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files
+# Copy composer files and install composer
 COPY composer.json composer.lock ./
-
-# Install composer (from official composer image)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Install PHP dependencies WITHOUT running scripts (artisan not copied yet)
+# Install dependencies without running artisan scripts yet
 RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
-# -----------------------------
-# Stage 2: Copy application code + run artisan commands
-# -----------------------------
+# Copy full application
 COPY . .
 
-# Now artisan exists → run scripts safely
+# Run artisan post-install commands safely
 RUN php artisan package:discover --ansi \
     && php artisan storage:link --force \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# -----------------------------
-# Stage 3: Build frontend assets (Vite + Tailwind)
-# -----------------------------
+# Build frontend assets (Vite + Tailwind)
 RUN npm ci && npm run build
 
-# -----------------------------
-# Stage 4: Final image ready to serve
-# -----------------------------
+# Expose Laravel default port
 EXPOSE 8000
 
-# Entrypoint: run PHP-FPM (production)
-CMD ["php-fpm"]
+# Entrypoint to always run artisan serve
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
