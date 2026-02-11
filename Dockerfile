@@ -5,15 +5,13 @@ RUN apk add --no-cache \
     git \
     curl \
     libpng-dev \
-    libonig-dev \
+    oniguruma-dev \     
     libxml2-dev \
     zip \
     unzip \
     mysql-client \
     postgresql-dev \
     bash \
-    tesseract-ocr \
-    tesseract-ocr-data-eng \
     nodejs npm
 
 # Install PHP extensions
