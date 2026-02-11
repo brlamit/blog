@@ -1,39 +1,68 @@
+############################################
+# STAGE 1 — Composer
+############################################
+FROM composer:latest AS vendor
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader
+
+
+############################################
+# STAGE 2 — Node build (Vite)
+############################################
+FROM node:20-alpine AS frontend
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+
+############################################
+# STAGE 3 — PHP-FPM
+############################################
 FROM php:8.2-fpm-alpine
 
-# Install system dependencies (fixed oniguruma-dev instead of libonig-dev)
+# Install dependencies + PHP extensions
 RUN apk add --no-cache \
-    git \
-    curl \
+    icu-dev \
+    libzip-dev \
     libpng-dev \
-    oniguruma-dev \               
-    libxml2-dev \
-    zip \
-    unzip \
-    mysql-client \
+    oniguruma-dev \
     postgresql-dev \
     bash \
-    nodejs npm \                  
-    && docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd
+    && docker-php-ext-install \
+        pdo_mysql \
+        pdo_pgsql \
+        mbstring \
+        gd \
+        intl \
+        zip \
+        bcmath \
+        exif \
+        pcntl
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files and install PHP dependencies
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-
-# Copy application code
+# Copy app
 COPY . .
 
-# Frontend build (Vite + Tailwind + Filament assets)
-RUN npm ci && npm run build
+# Copy vendor from composer stage
+COPY --from=vendor /app/vendor ./vendor
 
-# Copy docker entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+# Copy frontend assets
+COPY --from=frontend /app/public/build ./public/build
 
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+RUN chown -R www-data:www-data storage bootstrap/cache
+
+CMD ["php-fpm"]
