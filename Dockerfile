@@ -1,67 +1,52 @@
-# -------------------------
-# 1️⃣ Base image
-# -------------------------
 FROM php:8.2-fpm-alpine
 
-# -------------------------
-# 2️⃣ Install system dependencies + PHP extensions
-# -------------------------
+# Install system dependencies
 RUN apk add --no-cache \
-    bash \
     git \
-    icu-dev \
-    libzip-dev \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
     zip \
     unzip \
-    libpng-dev \
-    oniguruma-dev \
-    postgresql-dev \
-    nodejs npm \
     mysql-client \
-    && docker-php-ext-install \
-        pdo_mysql \
-        pdo_pgsql \
-        mbstring \
-        gd \
-        intl \
-        zip \
-        bcmath \
-        exif \
-        pcntl
+    postgresql-dev \
+    bash \
+    tesseract-ocr \
+    tesseract-ocr-data-eng \
+    nodejs npm
 
-# -------------------------
-# 3️⃣ Set working directory
-# -------------------------
-WORKDIR /var/www/html
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd intl zip
 
-# -------------------------
-# 4️⃣ Copy composer files and install dependencies without running artisan scripts
-# -------------------------
-COPY composer.json composer.lock ./
+# Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Install PHP dependencies (no scripts yet)
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy composer files and install PHP dependencies without running post-autoload scripts
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
-# -------------------------
-# 5️⃣ Copy full application
-# -------------------------
+# Copy full application code
 COPY . .
 
-# -------------------------
-# 6️⃣ Build frontend assets (Vite + Tailwind)
-# -------------------------
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Build frontend assets
 RUN npm ci && npm run build
 
-# -------------------------
-# 7️⃣ Set entrypoint
-# -------------------------
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+# Copy entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# -------------------------
-# 8️⃣ Expose port and default CMD
-# -------------------------
+# Expose port (Render will override with $PORT)
 EXPOSE 8000
-CMD ["php-fpm"]
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Use Render's PORT variable dynamically
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=${PORT}"]
