@@ -10,7 +10,7 @@ services:
           name: blog-db
           property: connectionString
       - key: APP_KEY
-        value: your-app-key-here   # generate locally
+        value: base64:5dvSqp3jGVXhYuHT6kge6S+4XsfNtr1262qKCU0OXfM=
       - key: APP_ENV
         value: production
     # ... other vars
