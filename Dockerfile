@@ -40,10 +40,7 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 COPY . .
 
 # Use production env file as default env
-RUN if [ -f .env.production ]; then cp .env.production .env; fi
-
-# Generate APP_KEY if not set
-RUN if ! grep -q "APP_KEY=" .env; then php artisan key:generate; fi
+RUN if [ -f .env.production ]; then cp .env.production .env; else cp .env.example .env || true; fi
 
 # Copy built assets from Node builder
 COPY --from=node-builder /build/public/build ./public/build
