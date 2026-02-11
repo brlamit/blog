@@ -3,9 +3,45 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{{ config('app.name', 'Blog ') }}</title>
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+        <title>{{ config('app.name', 'BLOG') }} — Personal Blog</title>
+
+        {{-- SEO / Meta --}}
+        @php
+            $metaDescription = 'A personal blog about technology, code and life.';
+            $metaImage = url('/favicon.svg');
+            $metaUrl = url()->current();
+            $isIndexable = app()->environment('production') ? 'index,follow' : 'noindex,nofollow';
+        @endphp
+
+        <meta name="description" content="{{ $metaDescription }}">
+        <meta name="robots" content="{{ $isIndexable }}">
+        <link rel="canonical" href="{{ $metaUrl }}">
+
+        <!-- Open Graph -->
+        <meta property="og:site_name" content="{{ config('app.name', 'BLOG') }}">
+        <meta property="og:title" content="{{ config('app.name', 'BLOG') }} — Personal Blog">
+        <meta property="og:description" content="{{ $metaDescription }}">
+        <meta property="og:url" content="{{ $metaUrl }}">
+        <meta property="og:image" content="{{ $metaImage }}">
+        <meta property="og:type" content="website">
+
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{{ config('app.name', 'BLOG') }} — Personal Blog">
+        <meta name="twitter:description" content="{{ $metaDescription }}">
+        <meta name="twitter:image" content="{{ $metaImage }}">
+
+        <!-- Favicons -->
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <link rel="shortcut icon" href="/favicon.svg" />
+
+        <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+        <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @php
             use Illuminate\Support\Facades\Storage;
