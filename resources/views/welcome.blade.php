@@ -89,11 +89,11 @@
                             <p class="text-lg text-slate-600">Explore blogs from our community</p>
                         </div>
                             <div class="mb-6 flex justify-center">
-                                <form method="GET" action="{{ route('home') }}" class="w-full sm:w-2/3 lg:w-1/2">
-                                    <div class="flex">
-                                        <input name="q" value="{{ request('q') }}" type="text" placeholder="Search blogs..." class="w-full rounded-l-md border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-3 py-2">
-                                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-r-md">Search</button>
-                                    </div>
+                                <form method="GET" action="{{ route('home') }}" class="w-full sm:w-3/4 lg:w-2/3">
+                                     <div class="flex gap-2">
+                                <input name="q" value="{{ request('q') }}" type="text" placeholder="Search blogs..." class="flex-1 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 px-5 py-3 text-base">
+                                <button type="submit" class="bg-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">Search</button>
+                            </div>
                                 </form>
                             </div>
                         @if(auth()->check())

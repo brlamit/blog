@@ -1,3 +1,11 @@
+# Stage 1: Build assets with Node
+FROM node:18-alpine AS node-builder
+WORKDIR /build
+COPY package*.json tailwind.config.js postcss.config.js vite.config.js ./
+COPY resources ./resources
+RUN npm ci && npm run build
+
+# Stage 2: PHP runtime
 FROM php:8.2-fpm-alpine
 
 # Install system dependencies
@@ -12,9 +20,10 @@ RUN apk add --no-cache \
     mysql-client \
     postgresql-dev \
     bash \
-    nodejs npm \
     libzip-dev \
-    pkgconf
+    pkgconf \
+    nginx \
+    supervisor
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd intl zip
@@ -32,21 +41,21 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 # Copy full application code
 COPY . .
 
+# Copy built assets from Node builder
+COPY --from=node-builder /build/public/build ./public/build
+
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Build frontend assets (Vite/Tailwind)
-RUN npm ci && npm run build
+# Create necessary directories
+RUN mkdir -p /var/log/supervisor
 
-# Copy entrypoint
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Copy supervisord config for running PHP-FPM and Nginx
+COPY docker-nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose port
 EXPOSE 8000
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
-# Use shell form so ${PORT} is expanded correctly
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
