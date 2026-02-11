@@ -1,13 +1,9 @@
 # Stage 1: Build assets with Node
 FROM node:18-alpine AS node-builder
-
 WORKDIR /build
-
 COPY package*.json tailwind.config.js vite.config.js ./
 COPY resources ./resources
-
 RUN npm ci && npm run build
-
 
 # Stage 2: PHP runtime
 FROM php:8.2-fpm-alpine
@@ -36,38 +32,41 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Install PHP dependencies
+# Copy composer files and install PHP dependencies
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
-# Copy project
+# Copy full application code
 COPY . .
 
-# Copy built assets
-COPY --from=node-builder /build/public/build ./public/build
-
-# Use production env
+# Use production env file as default env
 RUN if [ -f .env.production ]; then cp .env.production .env; else cp .env.example .env || true; fi
 
 # ✅ CREATE STORAGE LINK (VERY IMPORTANT FOR IMAGES)
 RUN php artisan storage:link || true
 
-# Permissions
+# Copy built assets from Node builder
+COPY --from=node-builder /build/public/build ./public/build
+
+# Set permissions
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Start Laravel
+# Start Laravel with proper startup sequence
 CMD sh -c '\
     if ! grep -q "APP_KEY=" .env; then php artisan key:generate --force; fi && \
     php artisan config:clear && \
-    php artisan cache:clear && \
     php artisan view:clear && \
     php artisan config:cache && \
-    php artisan route:cache && \
+    php artisan view:cache && \
     php artisan migrate --force && \
-    php artisan storage:link || true && \
+     php artisan storage:link || true && \
     php artisan serve --host=0.0.0.0 --port=$PORT \
 '
