@@ -1,1 +1,5 @@
-@import "./custom.css";
+@import "tailwindcss";
+
+@theme {
+    --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+}
