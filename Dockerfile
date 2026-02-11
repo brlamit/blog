@@ -39,6 +39,9 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 # Copy full application code
 COPY . .
 
+# Copy production env if exists
+COPY .env.production* ./
+
 # Copy built assets from Node builder
 COPY --from=node-builder /build/public/build ./public/build
 
