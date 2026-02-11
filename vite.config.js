@@ -8,4 +8,6 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    // Make sure base is set to '/' for production
+    base: '/',
 });
