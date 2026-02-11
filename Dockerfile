@@ -1,37 +1,25 @@
-FROM richarvey/nginx-php-fpm:3.1.6
+FROM php:8.2-fpm-alpine
 
-# Copy custom NGINX config first
-COPY conf/nginx/default.conf /etc/nginx/conf.d/default.conf
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
-
-# Install system/PHP dependencies
+# Install dependencies
 RUN apk add --no-cache \
-    git \
-    curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    libwebp-dev \
-    postgresql-dev \
+    git curl libpng-dev libjpeg-turbo-dev libwebp-dev postgresql-dev \
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install gd pdo_pgsql exif pcntl bcmath
 
-# Copy the ENTIRE app early so artisan is present for composer's post-scripts
+# Copy app
 COPY . /var/www/html
+WORKDIR /var/www/html
 
-# Now run composer install (vendor will be created here, artisan is available)
+# Install composer deps
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-# Env vars for runtime
-ENV WEBROOT=/var/www/html/public
-ENV PHP_ERRORS_STDERR=1
-ENV RUN_SCRIPTS=1
-ENV REAL_IP_HEADER=1
-
-# Fix permissions (run after copy/install)
+# Permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-EXPOSE 80
+# Expose port 8000 (artisan serve default)
+EXPOSE 8000
+
+# Start Laravel built-in server
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
