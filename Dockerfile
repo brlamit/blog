@@ -7,7 +7,7 @@ RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     zip \
-    nodejs npm \                          # ← Install Node.js & npm\
+    nodejs npm \                         
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install gd pdo_pgsql exif pcntl bcmath intl zip
 
