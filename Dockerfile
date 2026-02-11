@@ -5,14 +5,16 @@ RUN apk add --no-cache \
     git \
     curl \
     libpng-dev \
-    oniguruma-dev \     
+    oniguruma-dev \
     libxml2-dev \
     zip \
     unzip \
     mysql-client \
     postgresql-dev \
     bash \
-    nodejs npm
+    nodejs npm \
+    libzip-dev \
+    pkgconf
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql pdo_pgsql mbstring exif pcntl bcmath gd intl zip
@@ -23,7 +25,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files and install PHP dependencies without running post-autoload scripts
+# Copy composer files and install PHP dependencies
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
@@ -34,17 +36,17 @@ COPY . .
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Build frontend assets
+# Build frontend assets (Vite/Tailwind)
 RUN npm ci && npm run build
 
 # Copy entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose port (Render will override with $PORT)
+# Expose port
 EXPOSE 8000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Use Render's PORT variable dynamically
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=${PORT}"]
+# Use shell form so ${PORT} is expanded correctly
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
