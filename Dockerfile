@@ -1,4 +1,4 @@
-FROM php:8.2-cli-alpine
+FROM php:8.2-fpm-alpine
 
 # Install PHP extensions + Node.js/npm for Vite
 RUN apk add --no-cache \
@@ -7,11 +7,11 @@ RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
     zip \
-    nodejs npm \                          
+    nodejs npm \                          # ← Install Node.js & npm\
     && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install gd pdo_pgsql exif pcntl bcmath intl zip
 
-# Copy full app code (artisan must be present)
+# Copy full app code (artisan must be present for composer scripts)
 COPY . /var/www/html
 WORKDIR /var/www/html
 
@@ -19,7 +19,7 @@ WORKDIR /var/www/html
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-# Frontend build (this generates /public/build/ with manifest.json)
+# Frontend build (this generates /public/build/manifest.json and assets)
 RUN npm ci && npm run build
 
 # Permissions

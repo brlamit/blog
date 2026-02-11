@@ -7,6 +7,33 @@
 
         <title>{{ config('app.name', 'Blog') }}</title>
 
+            {{-- SEO / Meta: per-page overrides via @section('meta_title'), @section('meta_description'), @section('meta_image') --}}
+            @php
+                $metaTitle = View::hasSection('meta_title') ? trim($__env->yieldContent('meta_title')) : config('app.name', 'BLOG');
+                $metaDescription = View::hasSection('meta_description') ? trim($__env->yieldContent('meta_description')) : 'A personal blog about technology, code and life.';
+                $metaImage = View::hasSection('meta_image') ? trim($__env->yieldContent('meta_image')) : url('/favicon.svg');
+                $metaUrl = url()->current();
+                $isIndexable = app()->environment('production') ? 'index,follow' : 'noindex,nofollow';
+            @endphp
+
+            <meta name="description" content="{{ $metaDescription }}">
+            <meta name="robots" content="{{ $isIndexable }}">
+            <link rel="canonical" href="{{ $metaUrl }}">
+
+            <!-- Open Graph -->
+            <meta property="og:site_name" content="{{ config('app.name', 'BLOG') }}">
+            <meta property="og:title" content="{{ $metaTitle }}">
+            <meta property="og:description" content="{{ $metaDescription }}">
+            <meta property="og:url" content="{{ $metaUrl }}">
+            <meta property="og:image" content="{{ $metaImage }}">
+            <meta property="og:type" content="website">
+
+            <!-- Twitter -->
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{{ $metaTitle }}">
+            <meta name="twitter:description" content="{{ $metaDescription }}">
+            <meta name="twitter:image" content="{{ $metaImage }}">
+
         <!-- Favicons -->
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">
         <link rel="shortcut icon" href="/favicon.svg" />
