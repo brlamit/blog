@@ -1,7 +1,19 @@
 ############################################
-# STAGE 1 — Composer
+# STAGE 1 — Composer (FIXED)
 ############################################
-FROM composer:latest AS vendor
+FROM php:8.2-cli-alpine AS vendor
+
+# Install dependencies needed for composer + filament
+RUN apk add --no-cache \
+    icu-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    git \
+    && docker-php-ext-install intl zip
+
+# Install composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
@@ -15,25 +27,27 @@ RUN composer install \
 
 
 ############################################
-# STAGE 2 — Node build (Vite)
+# STAGE 2 — Node build (Vite assets)
 ############################################
 FROM node:20-alpine AS frontend
 
 WORKDIR /app
 
 COPY package*.json ./
+
 RUN npm install
 
 COPY . .
+
 RUN npm run build
 
 
 ############################################
-# STAGE 3 — PHP-FPM
+# STAGE 3 — Final PHP-FPM image
 ############################################
 FROM php:8.2-fpm-alpine
 
-# Install dependencies + PHP extensions
+# Install PHP extensions required by Laravel + Filament
 RUN apk add --no-cache \
     icu-dev \
     libzip-dev \
@@ -41,6 +55,7 @@ RUN apk add --no-cache \
     oniguruma-dev \
     postgresql-dev \
     bash \
+    nginx \
     && docker-php-ext-install \
         pdo_mysql \
         pdo_pgsql \
@@ -54,7 +69,7 @@ RUN apk add --no-cache \
 
 WORKDIR /var/www/html
 
-# Copy app
+# Copy application code
 COPY . .
 
 # Copy vendor from composer stage
@@ -63,6 +78,7 @@ COPY --from=vendor /app/vendor ./vendor
 # Copy frontend assets
 COPY --from=frontend /app/public/build ./public/build
 
+# Permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
 CMD ["php-fpm"]
