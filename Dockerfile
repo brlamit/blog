@@ -1,7 +1,7 @@
 # Stage 1: Build assets with Node
 FROM node:18-alpine AS node-builder
 WORKDIR /build
-COPY package*.json tailwind.config.js postcss.config.js vite.config.js ./
+COPY package*.json tailwind.config.js vite.config.js ./
 COPY resources ./resources
 RUN npm ci && npm run build
 
