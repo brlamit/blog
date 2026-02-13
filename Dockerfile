@@ -1,41 +1,56 @@
-# -----------------------------
-# Stage 1: Build frontend assets
-# -----------------------------
+# ==================================================
+# Stage 1 — Build frontend assets (Vite / Tailwind)
+# ==================================================
 FROM node:18-alpine AS node-builder
 
-WORKDIR /build
+WORKDIR /app
 
-# Copy only package files and configs
-COPY package*.json tailwind.config.js vite.config.js ./
+# Copy only required files first (better cache)
+COPY package*.json vite.config.js tailwind.config.js ./
+RUN npm ci
 
-# Copy resources folder
+# Copy frontend resources
 COPY resources ./resources
 
-# Install node modules and build assets
-RUN npm ci
+# Build assets
 RUN npm run build
 
-# -----------------------------
-# Stage 2: PHP Runtime
-# -----------------------------
+
+# ==================================================
+# Stage 2 — Composer dependencies
+# ==================================================
+FROM composer:latest AS composer-builder
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+# Install only production dependencies
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-interaction \
+    --prefer-dist
+
+
+# ==================================================
+# Stage 3 — Production PHP Runtime
+# ==================================================
 FROM php:8.2-fpm-alpine
 
-# Install system dependencies
+# Install system packages
 RUN apk add --no-cache \
+    bash \
     git \
     curl \
     libpng-dev \
-    oniguruma-dev \
     libxml2-dev \
+    oniguruma-dev \
+    libzip-dev \
+    postgresql-dev \
+    mysql-client \
     zip \
     unzip \
-    mysql-client \
-    postgresql-dev \
-    bash \
-    libzip-dev \
-    pkgconf \
-    bash \
-    shadow \
     tini
 
 # Install PHP extensions
@@ -43,63 +58,52 @@ RUN docker-php-ext-install \
     pdo_mysql \
     pdo_pgsql \
     mbstring \
-    exif \
-    pcntl \
     bcmath \
     gd \
     intl \
-    zip
+    zip \
+    exif \
+    pcntl
 
-# Install latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Enable OPcache (production performance)
+RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+    && echo "opcache.memory_consumption=128" >> /usr/local/etc/php/conf.d/opcache.ini \
+    && echo "opcache.max_accelerated_files=10000" >> /usr/local/etc/php/conf.d/opcache.ini
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy composer files
-COPY composer.json composer.lock ./
-
-# Install PHP dependencies without running artisan scripts yet
-RUN composer install --no-dev --optimize-autoloader --no-scripts --prefer-dist
-
-# Copy full Laravel project
+# Copy Laravel project
 COPY . .
 
-# Use production env by default
-RUN if [ -f .env.production ]; then cp .env.production .env; else cp .env.example .env || true; fi
-
-# Create storage symlink for images
-RUN php artisan storage:link || true
+# Copy vendor from composer stage (FASTER builds)
+COPY --from=composer-builder /app/vendor ./vendor
 
 # Copy built frontend assets
-COPY --from=node-builder /build/public/build ./public/build
+COPY --from=node-builder /app/public/build ./public/build
 
-# Set permissions for Laravel storage and cache
+# Create env if not exists
+RUN if [ -f .env.production ]; then cp .env.production .env; else cp .env.example .env || true; fi
+
+# Permissions
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache
 
-# Copy entrypoint script if you have one
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Use tini for proper signal handling
+ENTRYPOINT ["tini","--"]
 
-# Expose port (Render will use $PORT)
+# Expose Render port
 EXPOSE 8000
 
-# Use tini as init to handle signals properly
-ENTRYPOINT ["tini", "--", "/usr/local/bin/entrypoint.sh"]
-
-# -----------------------------
-# Run Laravel with proper setup
-# -----------------------------
+# ==================================================
+# Production startup
+# ==================================================
 CMD sh -c '\
-    if ! grep -q "APP_KEY=" .env; then php artisan key:generate --force; fi && \
-    php artisan config:clear && \
-    php artisan cache:clear && \
-    php artisan route:clear && \
-    php artisan view:clear && \
-    php artisan config:cache && \
-    php artisan view:cache && \
-    php artisan migrate --force && \
-    php artisan storage:link || true && \
-    php -S 0.0.0.0:$PORT -t public \
+php artisan config:clear && \
+php artisan cache:clear && \
+php artisan config:cache && \
+php artisan view:cache && \
+php artisan migrate --force || true && \
+php artisan storage:link || true && \
+php -S 0.0.0.0:$PORT -t public \
 '
