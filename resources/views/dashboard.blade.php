@@ -1,6 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">Welcome to Your Dashboard </x-slot>
-
+   
     @php
         $myPosts = $myPosts ?? collect();
         if (!isset($allPosts)) {

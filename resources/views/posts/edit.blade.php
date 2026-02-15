@@ -1,7 +1,5 @@
 <x-app-layout>
-    <x-slot name="header">
-        Edit Your Blog ✏️
-    </x-slot>
+   
 
     <div class="py-12 flex items-center justify-center min-h-screen">
         <div class="w-full max-w-4xl px-4 sm:px-6 lg:px-8">
