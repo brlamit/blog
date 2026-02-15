@@ -6,26 +6,25 @@ use Illuminate\Support\ServiceProvider;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL; // ⭐ ADD THIS
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        // Register a default Filament panel early so Filament console commands can use it.
         if (class_exists(\Filament\Facades\Filament::class)) {
             Filament::registerPanel(fn () => Panel::make()->id('admin')->path('admin')->default());
         }
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        // Push temporary admin request logging middleware to the web group for diagnosis.
+        // ⭐ FORCE HTTPS FOR RENDER
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
+        // Existing middleware
         if (class_exists(\Illuminate\Routing\Router::class)) {
             $this->app['router']->pushMiddlewareToGroup('web', \App\Http\Middleware\LogRequestDetails::class);
         }
